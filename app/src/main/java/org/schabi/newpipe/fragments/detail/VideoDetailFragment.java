@@ -2646,9 +2646,7 @@ public final class VideoDetailFragment
         binding.detailControlsShare.setVisibility(View.VISIBLE);
         binding.detailControlsOpenInBrowser.setVisibility(View.VISIBLE);
         binding.detailControlsCast.setVisibility(
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-                        && FCastManager.canCast(requireContext(), info)
-                        ? View.VISIBLE : View.GONE);
+                FCastManager.hasTargets(requireContext(), info) ? View.VISIBLE : View.GONE);
         binding.detailControlsPlayWithKodi.setVisibility(
                 KoreUtils.shouldShowPlayWithKodi(requireContext(), info.getServiceId())
                         ? View.VISIBLE : View.GONE);
