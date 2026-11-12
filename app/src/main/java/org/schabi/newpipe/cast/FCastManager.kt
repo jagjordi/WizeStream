@@ -37,6 +37,7 @@ import org.schabi.newpipe.util.ListHelper
 import org.schabi.newpipe.util.StreamTypeUtil
 import org.schabi.newpipe.util.external_communication.ShareUtils
 import org.schabi.newpipe.util.external_communication.TubeBeamUtils
+import org.schabi.newpipe.util.external_communication.YtFifoUtils
 
 /** Application-scoped discovery and playback handoff for FCast-compatible TV receivers. */
 object FCastManager {
@@ -68,9 +69,17 @@ object FCastManager {
     @JvmStatic
     fun canSendToTv(context: Context, info: StreamInfo): Boolean = TubeBeamUtils.shouldShowSendToTv(context, info.serviceId)
 
+    /** Whether a yt-fifo server is configured, so the stream's audio can be sent to the home audio system. */
+    @JvmStatic
+    fun canSendToHomeAudio(context: Context): Boolean = YtFifoUtils.shouldShowHomeAudio(context)
+
+    /** Whether the Cast button has anything to offer for this stream. */
+    @JvmStatic
+    fun hasTargets(context: Context, info: StreamInfo): Boolean = canCast(context, info) || canSendToTv(context, info) || canSendToHomeAudio(context)
+
     @JvmStatic
     fun showDevicePicker(context: Context, info: StreamInfo, localPlayer: Player?) {
-        if (!isAvailable() && !canSendToTv(context, info)) return
+        if (!hasTargets(context, info)) return
         val connectedDevice = activeDevice
         val connectedName = activeDeviceName
         if (connectedDevice?.isReady() == true && connectedName != null) {
@@ -82,17 +91,27 @@ object FCastManager {
 
     private fun showAvailableDevices(context: Context, info: StreamInfo, localPlayer: Player?) {
         val source = if (isAvailable()) selectSource(context, info) else null
-        // TubeBeam rows are fixed at the top of the list; discovered receivers follow them.
-        val tubeBeamLabels = if (canSendToTv(context, info)) {
+        // Fixed rows (TubeBeam, home audio) sit at the top of the list; discovered receivers follow them.
+        val fixedRows = mutableListOf<FixedRow>()
+        if (canSendToTv(context, info)) {
             val appName = context.getString(R.string.tubebeam_app_name)
-            listOf(
-                "$appName · ${context.getString(R.string.send_to_tv_title)}",
-                "$appName · ${context.getString(R.string.queue_on_tv_title)}"
-            )
-        } else {
-            emptyList()
+            fixedRows += FixedRow("$appName · ${context.getString(R.string.send_to_tv_title)}") {
+                sendToTubeBeam(context, info, localPlayer, enqueue = false)
+            }
+            fixedRows += FixedRow("$appName · ${context.getString(R.string.queue_on_tv_title)}") {
+                sendToTubeBeam(context, info, localPlayer, enqueue = true)
+            }
         }
-        if (source == null && tubeBeamLabels.isEmpty()) {
+        if (canSendToHomeAudio(context)) {
+            val name = context.getString(R.string.home_audio_name)
+            fixedRows += FixedRow("$name · ${context.getString(R.string.play_on_home_audio_title)}") {
+                sendToHomeAudio(context, info, localPlayer, playNow = true)
+            }
+            fixedRows += FixedRow("$name · ${context.getString(R.string.queue_on_home_audio_title)}") {
+                sendToHomeAudio(context, info, localPlayer, playNow = false)
+            }
+        }
+        if (source == null && fixedRows.isEmpty()) {
             Toast.makeText(context, R.string.cast_no_compatible_stream, Toast.LENGTH_LONG).show()
             return
         }
@@ -105,10 +124,10 @@ object FCastManager {
         val dialog = MaterialAlertDialogBuilder(context)
             .setTitle(R.string.cast_to_tv)
             .setAdapter(adapter) { _, position ->
-                if (position < tubeBeamLabels.size) {
-                    sendToTubeBeam(context, info, localPlayer, enqueue = position == 1)
+                if (position < fixedRows.size) {
+                    fixedRows[position].action()
                 } else if (source != null) {
-                    availableDevices.getOrNull(position - tubeBeamLabels.size)?.let {
+                    availableDevices.getOrNull(position - fixedRows.size)?.let {
                         connect(context, it, source, createPlaybackHandoff(info, localPlayer))
                     }
                 }
@@ -123,7 +142,7 @@ object FCastManager {
             availableDevices.clear()
             if (source != null) availableDevices.addAll(currentDevices.filter(::isResolved))
             labels.clear()
-            labels.addAll(tubeBeamLabels)
+            labels.addAll(fixedRows.map { it.label })
             labels.addAll(availableDevices.map(::deviceLabel))
             adapter.notifyDataSetChanged()
             dialog.setTitle(
@@ -362,6 +381,18 @@ object FCastManager {
         }
     }
 
+    /**
+     * Sends the stream to the yt-fifo server, which plays its audio on the home audio system. When
+     * the stream is being played locally and is played now (not queued), local playback is paused
+     * like for a cast.
+     */
+    private fun sendToHomeAudio(context: Context, info: StreamInfo, localPlayer: Player?, playNow: Boolean) {
+        YtFifoUtils.sendToHomeAudio(context, info.url, playNow)
+        if (playNow && localPlayer != null && isSameStream(localPlayer, info) && localPlayer.isPlaying) {
+            localPlayer.pause()
+        }
+    }
+
     private fun createPlaybackHandoff(info: StreamInfo, player: Player?): PlaybackHandoff? {
         if (player == null || !isSameStream(player, info)) return null
 
@@ -442,4 +473,7 @@ object FCastManager {
     }
 
     private data class CastSource(val url: String, val contentType: String)
+
+    /** A picker entry that is not a discovered receiver. */
+    private class FixedRow(val label: String, val action: () -> Unit)
 }

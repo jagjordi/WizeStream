@@ -58,6 +58,7 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:resizeableActivity="true"
         android:theme="@style/OpeningTheme"
+        android:usesCleartextTraffic="true"
         tools:ignore="AllowBackup">
 
         <meta-data

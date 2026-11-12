@@ -203,6 +203,13 @@
     <string name="play_with_kodi_title">Play with Kodi</string>
     <string name="send_to_tv_title">Send to TV</string>
     <string name="queue_on_tv_title">Queue on TV</string>
+    <string name="play_on_home_audio_title">Play on home audio</string>
+    <string name="queue_on_home_audio_title">Queue on home audio</string>
+    <string name="home_audio_playing">Playing on home audio: %1$s</string>
+    <string name="home_audio_queued">Queued on home audio: %1$s</string>
+    <string name="home_audio_failed">Home audio: %1$s</string>
+    <string name="yt_fifo_url_title">Home audio server (yt-fifo)</string>
+    <string name="yt_fifo_url_summary">URL of your yt-fifo server, e.g. http://192.168.1.10:8888. When set, "Play on home audio" and "Queue on home audio" appear in the video menu and the Cast picker</string>
     <string name="kore_not_found">Install missing Kore app\?</string>
     <string name="show_play_with_kodi_title">Show \"Play with Kodi\" option</string>
     <string name="show_play_with_kodi_summary">Display an option to play a video via Kodi media center</string>
